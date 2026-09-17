@@ -1,0 +1,915 @@
+/* ==========================================================================
+   윤서율 · 진로 포트폴리오
+   Layout modelled on the two-pane developer-portfolio pattern popularised by
+   brittanychiang.com: a sticky left column that never scrolls, a scrolling
+   content column on the right, and content as 8-column rows rather than cards.
+   Palette follows Tailwind's slate / teal ramps. Type is Pretendard.
+   ========================================================================== */
+
+/* Colour tokens lifted from Radix Colors (radix-ui.com/colors), dark ramps.
+   The point colour is plain white — no chroma at all, so nothing glows.
+   Swap themes via data-theme on <html>: sand | bronze | mono.               */
+
+:root,
+:root[data-theme="sand"] {
+  --bg: #111110;              /* sand-1   */
+  --bg-2: #222221;            /* sand-3   */
+  --line: #3b3a37;            /* sand-6   */
+  --meta: #7c7b74;            /* sand-10  */
+  --text: #b5b3ad;            /* sand-11  */
+  --heading: #eeeeec;         /* sand-12  */
+  --accent: #ffffff;          /* point colour — 18.9:1 */
+  --accent-soft: rgba(255, 255, 255, 0.09);
+
+  --row-hover: #191918;       /* sand-2   */
+  --row-edge: rgba(255, 255, 255, 0.05);
+  --card: rgba(34, 34, 33, 0.5);
+  --card-hover: #222221;
+  --glow: rgba(238, 238, 236, 0.025);
+  --scrim: rgba(17, 17, 16, 0.75);
+  --scrim-solid: rgba(10, 10, 9, 0.95);
+}
+
+:root[data-theme="bronze"] {
+  --bg: #141110;              /* bronze-1  */
+  --bg-2: #262220;            /* bronze-3  */
+  --line: #493e3a;            /* bronze-6  */
+  --meta: #a18072;            /* bronze-9  */
+  --text: #d4b3a5;            /* bronze-11 */
+  --heading: #ede0d9;         /* bronze-12 */
+  --accent: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.09);
+
+  --row-hover: #1c1917;       /* bronze-2  */
+  --row-edge: rgba(255, 255, 255, 0.05);
+  --card: rgba(38, 34, 32, 0.5);
+  --card-hover: #262220;
+  --glow: rgba(237, 224, 217, 0.025);
+  --scrim: rgba(20, 17, 16, 0.75);
+  --scrim-solid: rgba(12, 10, 9, 0.95);
+}
+
+/* No chroma at all — hierarchy carried entirely by brightness. */
+:root[data-theme="mono"] {
+  --bg: #111110;
+  --bg-2: #222221;
+  --line: #3b3a37;
+  --meta: #7c7b74;
+  --text: #b5b3ad;
+  --heading: #eeeeec;
+  --accent: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.09);
+
+  --row-hover: #191918;
+  --row-edge: rgba(255, 255, 255, 0.05);
+  --card: rgba(34, 34, 33, 0.5);
+  --card-hover: #222221;
+  --glow: rgba(238, 238, 236, 0.025);
+  --scrim: rgba(17, 17, 16, 0.75);
+  --scrim-solid: rgba(10, 10, 9, 0.95);
+}
+
+:root {
+  --pane: 1216px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", sans-serif;
+  font-size: 1rem;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  color: var(--heading);
+  line-height: 1.3;
+}
+
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* Placeholder slots — every unfilled bit of copy carries class="ph" so it is
+   obvious on screen and greppable in the markup. Delete the class as you fill
+   each one in; no other styling depends on it. -------------------------------- */
+
+.ph {
+  color: var(--meta) !important;
+  font-style: italic;
+  opacity: 0.55;
+}
+
+.ph::before {
+  content: "· ";
+}
+
+/* Cursor glow ------------------------------------------------------------- */
+
+.glow {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: radial-gradient(
+    420px at var(--glow-x, 50%) var(--glow-y, 0%),
+    var(--glow),
+    transparent 70%
+  );
+  transition: background 120ms ease;
+}
+
+/* Two-pane shell ---------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 48%) minmax(0, 52%);
+  width: min(var(--pane), calc(100% - 3rem));
+  margin-inline: auto;
+  gap: 0 3rem;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  max-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6rem 0;
+}
+
+.content {
+  padding: 6rem 0 0;
+}
+
+/* Sidebar ----------------------------------------------------------------- */
+
+.kicker,
+.row-meta,
+.nav-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kicker {
+  margin-bottom: 1rem;
+  color: var(--accent);
+}
+
+.name {
+  font-size: clamp(2.4rem, 4.4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.role {
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.tagline {
+  max-width: 22rem;
+  margin-top: 1rem;
+  line-height: 1.7;
+}
+
+.side-nav {
+  display: none;
+  margin-top: 4rem;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0;
+  gap: 1rem;
+  color: var(--meta);
+}
+
+.nav-line {
+  display: block;
+  width: 2rem;
+  height: 1px;
+  background: var(--meta);
+  transition: width 180ms ease, background 180ms ease;
+}
+
+.nav-link:hover .nav-line,
+.nav-link.is-active .nav-line {
+  width: 4rem;
+  background: var(--heading);
+}
+
+.nav-link:hover .nav-text,
+.nav-link.is-active .nav-text {
+  color: var(--heading);
+}
+
+/* Sections ---------------------------------------------------------------- */
+
+.section {
+  margin-bottom: 6rem;
+  scroll-margin-top: 6rem;
+}
+
+.section-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: none;
+  margin: 0 -1.5rem 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--scrim);
+  backdrop-filter: blur(8px);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.prose {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.prose b {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.sub-head {
+  margin: 3rem 0 1.25rem;
+}
+
+.sub-head h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sub-head p {
+  margin-top: 0.5rem;
+  max-width: 44ch;
+}
+
+/* Info list — the home section's identity block. ------------------------- */
+
+.info-list {
+  display: grid;
+  margin: 0;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.25rem 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.info-row:last-child {
+  border-bottom: 0;
+}
+
+.info-row dt {
+  grid-column: span 2;
+  color: var(--meta);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1.9;
+  text-transform: uppercase;
+}
+
+.info-row dd {
+  grid-column: span 6;
+  margin: 0;
+  color: var(--heading);
+}
+
+.info-row a {
+  border-bottom: 1px solid var(--line);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.info-row a:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Row list — the signature interaction: hovering the list dims every row
+   except the one under the pointer. ---------------------------------------- */
+
+.row-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  padding: 1rem 0;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.25rem 1rem;
+  transition: opacity 180ms ease;
+}
+
+.row-bg {
+  position: absolute;
+  inset: -0.25rem -1.5rem;
+  z-index: 0;
+  border-radius: 6px;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+.row-meta,
+.row-body {
+  position: relative;
+  z-index: 1;
+}
+
+.row-meta {
+  grid-column: span 2;
+  padding-top: 0.35rem;
+  color: var(--meta);
+}
+
+.row-body {
+  grid-column: span 6;
+}
+
+.row-body h3 {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.row-body p {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.row.is-hidden {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .row-list:hover .row {
+    opacity: 0.5;
+  }
+
+  .row-list .row:hover {
+    opacity: 1;
+  }
+
+  .row-list .row:hover .row-bg {
+    background: var(--row-hover);
+    box-shadow: inset 0 1px 0 0 var(--row-edge);
+  }
+}
+
+/* Tag pills --------------------------------------------------------------- */
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.tags li {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Tech stack — same row grid, but the body is only pills. ---------------- */
+
+.stack-list .row {
+  padding: 0.7rem 0;
+}
+
+.stack-list .tags {
+  margin-top: 0;
+}
+
+.stack-list .row-meta {
+  padding-top: 0.3rem;
+}
+
+/* Filter pills ------------------------------------------------------------ */
+
+.section-switch {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.switch-pill {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.switch-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.switch-pill.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Worksheets -------------------------------------------------------------- */
+
+.worksheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.ghost-button {
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.ghost-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.worksheet-status:empty {
+  display: none;
+}
+
+.worksheet-status {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.worksheet-note {
+  margin-top: 0.6rem;
+  color: var(--meta);
+  font-size: 0.75rem;
+}
+
+.worksheet-frame {
+  position: relative;
+}
+
+.worksheet-remove {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.worksheet:hover .worksheet-remove,
+.worksheet-remove:focus-visible {
+  opacity: 1;
+}
+
+.worksheet-remove:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.worksheet-badge {
+  margin-left: 0.4rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+.worksheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1.25rem 1rem;
+}
+
+.worksheet {
+  margin: 0;
+}
+
+.worksheet-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.worksheet-open:hover,
+.worksheet-open:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+
+.worksheet-open img {
+  width: 100%;
+  aspect-ratio: 1 / 1.32;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 0.82;
+  transition: opacity 160ms ease;
+}
+
+.worksheet-open:hover img {
+  opacity: 1;
+}
+
+.worksheet figcaption {
+  padding-top: 0.6rem;
+  color: var(--meta);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.worksheet figcaption b {
+  display: block;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+/* Projects — marquee ------------------------------------------------------ */
+
+.project-marquee {
+  display: grid;
+  gap: 1rem;
+}
+
+.marquee {
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 1rem;
+}
+
+.marquee-track.is-running {
+  animation: marquee-left var(--duration, 40s) linear infinite;
+}
+
+.marquee[data-direction="right"] .marquee-track.is-running {
+  animation-name: marquee-right;
+}
+
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
+  animation-play-state: paused;
+}
+
+.marquee-track .project-card {
+  flex: 0 0 clamp(300px, 36vw, 440px);
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem 1.25rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.marquee:hover .project-card:hover {
+  border-color: var(--accent);
+  background: var(--card-hover);
+}
+
+.project-card h3 {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.project-card p:not(.row-meta) {
+  margin-top: 0.45rem;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.project-card .role-note {
+  color: var(--text);
+}
+
+.project-card .role-note b {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.project-card .tags {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(var(--shift) * -1));
+  }
+}
+
+@keyframes marquee-right {
+  from {
+    transform: translateX(calc(var(--shift) * -1));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Worksheet viewer -------------------------------------------------------- */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  background: var(--scrim-solid);
+  backdrop-filter: blur(4px);
+}
+
+/* author `display: flex` above outranks the UA sheet's [hidden] rule */
+.viewer[hidden] {
+  display: none;
+}
+
+.viewer-stage {
+  display: flex;
+  max-width: min(980px, 100%);
+  max-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  gap: 0.75rem;
+}
+
+.viewer-stage img {
+  max-width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  border-radius: 4px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.viewer-stage figcaption {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.viewer-close,
+.viewer-nav {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--heading);
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.viewer-close:hover,
+.viewer-nav:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.viewer-nav {
+  width: 44px;
+  height: 44px;
+  font-size: 1.5rem;
+}
+
+.viewer-close {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 38px;
+  height: 38px;
+  font-size: 0.85rem;
+}
+
+/* Back to top ------------------------------------------------------------- */
+
+.top-button {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 40;
+  display: none;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--scrim-solid);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.top-button:hover {
+  border-color: var(--accent);
+}
+
+.top-button.is-visible {
+  display: block;
+}
+
+/* Desktop ----------------------------------------------------------------- */
+
+@media (min-width: 1024px) {
+  .side-nav {
+    display: block;
+  }
+}
+
+/* Mobile / tablet — one column, sticky section labels ---------------------- */
+
+@media (max-width: 1023px) {
+  .layout {
+    grid-template-columns: 1fr;
+    width: min(var(--pane), calc(100% - 2.5rem));
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    padding: 4rem 0 3rem;
+    gap: 2rem;
+  }
+
+  .content {
+    padding-top: 0;
+  }
+
+  .section-sticky {
+    display: block;
+    margin-inline: -1.25rem;
+    padding-inline: 1.25rem;
+  }
+
+  .section {
+    margin-bottom: 4rem;
+  }
+
+  .row {
+    padding: 0.75rem 0;
+    grid-template-columns: 1fr;
+  }
+
+  /* Desktop-only hover affordance; its negative inset would overflow here. */
+  .row-bg {
+    display: none;
+  }
+
+  .row-meta,
+  .row-body {
+    grid-column: 1;
+  }
+
+  .info-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-row dt,
+  .info-row dd {
+    grid-column: 1;
+  }
+
+  .info-row dt {
+    line-height: 1.6;
+  }
+
+  .row-meta {
+    padding-top: 0;
+  }
+
+  .viewer {
+    padding: 0.75rem;
+  }
+
+  .viewer-nav {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .glow {
+    display: none;
+  }
+
+  .marquee {
+    overflow-x: auto;
+  }
+
+  .marquee-track.is-running {
+    animation: none;
+  }
+}
