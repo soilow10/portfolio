@@ -1,20 +1,10 @@
-/* WORKSHEETS (기본 학습지 목록) 는 js/worksheets.js 에서 옵니다. */
+/* WORKSHEETS (기본 학습지 목록) 는 js/worksheets.js 에서 옵니다.
+   물고기 움직임은 js/aquarium.js 가 맡습니다. 여기서는 패널과 내용을 다룹니다. */
 
 const MARQUEE_SPEED = 30;
 const marqueeBoards = [];
 
-/* Cursor glow ------------------------------------------------------------- */
-
-const glow = document.querySelector(".glow");
-
-if (glow && window.matchMedia("(pointer: fine)").matches) {
-  window.addEventListener("pointermove", (event) => {
-    glow.style.setProperty("--glow-x", `${event.clientX}px`);
-    glow.style.setProperty("--glow-y", `${event.clientY}px`);
-  });
-}
-
-/* Worksheets -------------------------------------------------------------- */
+/* 학습지 ------------------------------------------------------------------ */
 /* 기본 학습지는 파일에서, 사용자가 올린 학습지는 localStorage 에서 온다.
    올린 것은 이 브라우저에만 남는다 — 서버가 없으므로 다른 사람에게는 보이지 않는다. */
 
@@ -186,35 +176,7 @@ if (worksheetAdd && worksheetFile) {
 
 renderWorksheets();
 
-/* Scroll spy — highlight the nav item for whichever section is in view ----- */
-
-const navLinks = [...document.querySelectorAll(".nav-link")];
-const sections = navLinks
-  .map((link) => document.querySelector(link.getAttribute("href")))
-  .filter(Boolean);
-
-function updateActiveNav() {
-  // The section whose top has passed 30% down the viewport is the current one.
-  const mark = window.scrollY + window.innerHeight * 0.3;
-  let currentId = sections[0].id;
-
-  sections.forEach((section) => {
-    if (section.getBoundingClientRect().top + window.scrollY <= mark) {
-      currentId = section.id;
-    }
-  });
-
-  navLinks.forEach((link) => {
-    link.classList.toggle("is-active", link.getAttribute("href") === `#${currentId}`);
-  });
-}
-
-if (sections.length) {
-  window.addEventListener("scroll", updateActiveNav, { passive: true });
-  updateActiveNav();
-}
-
-/* Project marquee --------------------------------------------------------- */
+/* 프로젝트 마퀴 ----------------------------------------------------------- */
 
 function buildRow(row, filter) {
   const track = row.querySelector(".marquee-track");
@@ -230,8 +192,7 @@ function buildRow(row, filter) {
 
   const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
 
-  // Repeat the set until one pass is at least as wide as the row, so the
-  // second copy always covers the gap the first one leaves behind.
+  // 한 바퀴가 줄 너비보다 넓어질 때까지 반복해야 복제본이 빈틈을 덮는다.
   let guard = 0;
   while (track.scrollWidth < row.clientWidth + gap && guard < 20) {
     source.forEach((card) => track.append(card.cloneNode(true)));
@@ -263,12 +224,11 @@ document.querySelectorAll(".project-marquee").forEach((board) => {
       card.cloneNode(true)
     );
   });
-
+  board.filter = "all";
   marqueeBoards.push(board);
-  buildMarquee(board, "all");
 });
 
-/* Filters ----------------------------------------------------------------- */
+/* 필터 -------------------------------------------------------------------- */
 
 document.querySelectorAll(".section-switch").forEach((group) => {
   const pills = group.querySelectorAll(".switch-pill");
@@ -292,12 +252,58 @@ document.querySelectorAll(".section-switch").forEach((group) => {
     pill.addEventListener("click", () => applyFilter(pill));
   });
 
-  // Match the markup's pre-selected pill instead of showing every row at load.
   const preselected = group.querySelector(".switch-pill.is-selected");
   if (preselected && rows.length) applyFilter(preselected);
 });
 
-/* Worksheet viewer -------------------------------------------------------- */
+/* 패널 -------------------------------------------------------------------- */
+
+const panelLayer = document.getElementById("panel-layer");
+const panels = [...document.querySelectorAll(".panel")];
+let panelOpener = null;
+
+function openPanel(id, opener) {
+  if (!panelLayer) return;
+  panelOpener = opener || null;
+
+  panels.forEach((panel) => {
+    panel.hidden = panel.dataset.panel !== id;
+  });
+  panelLayer.hidden = false;
+
+  const active = panels.find((panel) => !panel.hidden);
+  if (!active) return;
+
+  active.querySelector(".panel-body").scrollTop = 0;
+  active.querySelector(".panel-close").focus();
+
+  // 숨어 있는 동안에는 너비가 0이라 마퀴를 만들 수 없다. 열릴 때 만든다.
+  marqueeBoards
+    .filter((board) => active.contains(board))
+    .forEach((board) => buildMarquee(board, board.filter));
+}
+
+function closePanel() {
+  if (!panelLayer || panelLayer.hidden) return;
+  panelLayer.hidden = true;
+  panels.forEach((panel) => { panel.hidden = true; });
+  if (panelOpener && document.contains(panelOpener)) panelOpener.focus();
+}
+
+document.querySelectorAll("[data-section]").forEach((trigger) => {
+  trigger.addEventListener("click", () => openPanel(trigger.dataset.section, trigger));
+});
+
+if (panelLayer) {
+  panelLayer.querySelectorAll("[data-close]").forEach((el) => {
+    el.addEventListener("click", closePanel);
+  });
+  panels.forEach((panel) => {
+    panel.querySelector(".panel-close").addEventListener("click", closePanel);
+  });
+}
+
+/* 학습지 뷰어 ------------------------------------------------------------- */
 
 const viewer = document.getElementById("worksheet-viewer");
 const viewerImage = document.getElementById("viewer-image");
@@ -320,14 +326,12 @@ function openViewer(index) {
   viewerOpener = worksheetGrid.querySelector(`.worksheet-open[data-index="${index}"]`);
   renderViewer();
   viewer.hidden = false;
-  document.body.style.overflow = "hidden";
   viewer.querySelector(".viewer-close").focus();
 }
 
 function closeViewer() {
   viewer.hidden = true;
   viewerImage.src = "";
-  document.body.style.overflow = "";
   if (viewerOpener && document.contains(viewerOpener)) viewerOpener.focus();
 }
 
@@ -342,35 +346,20 @@ if (viewer) {
   viewer.querySelector(".viewer-prev").addEventListener("click", () => stepViewer(-1));
   viewer.querySelector(".viewer-next").addEventListener("click", () => stepViewer(1));
 
-  // Clicking the dark backdrop closes; clicking the image or a control does not.
+  // 어두운 바깥을 누르면 닫힌다. 이미지나 버튼을 누른 경우는 아니다.
   viewer.addEventListener("click", (event) => {
     if (event.target === viewer) closeViewer();
   });
+}
 
-  document.addEventListener("keydown", (event) => {
-    if (viewer.hidden) return;
+/* 키보드 — 뷰어가 열려 있으면 뷰어가 먼저 받는다. ------------------------- */
+
+document.addEventListener("keydown", (event) => {
+  if (viewer && !viewer.hidden) {
     if (event.key === "Escape") closeViewer();
     if (event.key === "ArrowLeft") stepViewer(-1);
     if (event.key === "ArrowRight") stepViewer(1);
-  });
-}
-
-/* Back to top + resize ---------------------------------------------------- */
-
-const topButton = document.querySelector(".top-button");
-
-window.addEventListener("scroll", () => {
-  topButton.classList.toggle("is-visible", window.scrollY > 400);
-});
-
-topButton.addEventListener("click", () => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-
-let resizeTimer;
-window.addEventListener("resize", () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    marqueeBoards.forEach((board) => buildMarquee(board, board.filter));
-  }, 200);
+    return;
+  }
+  if (event.key === "Escape") closePanel();
 });
